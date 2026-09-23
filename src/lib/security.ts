@@ -31,11 +31,19 @@ export class ApiError extends Error {
 }
 export function sameOrigin(request: NextRequest) {
   const origin = request.headers.get("origin");
-  if (
-    origin &&
-    origin !== new URL(request.url).origin &&
-    origin !== process.env.NEXT_PUBLIC_SITE_URL
-  )
+  if (!origin) return;
+
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const host = forwardedHost || request.headers.get("host");
+  const forwardedProtocol = request.headers.get("x-forwarded-proto");
+  const protocol = forwardedProtocol || new URL(request.url).protocol.slice(0, -1);
+  const allowed = new Set([
+    new URL(request.url).origin,
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, ""),
+    host ? `${protocol}://${host}` : undefined,
+  ]);
+
+  if (!allowed.has(origin.replace(/\/$/, "")))
     throw new ApiError(403, "Сұрау көзіне рұқсат жоқ.");
 }
 export async function rateLimit(key: string, limit: number, seconds = 60) {
