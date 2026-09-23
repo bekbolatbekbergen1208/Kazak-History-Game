@@ -1,0 +1,37 @@
+{
+  "name": "tarihi-missiya",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --hostname 0.0.0.0 --port 3000",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0 --port 3000",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "test:classroom": "node tests/classroom.browser.mjs",
+    "local:database": "node tests/support/run-fixture.mjs",
+    "local:app": "node tests/support/run-local-app.mjs",
+    "format": "prettier --write src tests next.config.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.0",
+    "lucide-react": "^0.468.0",
+    "next": "^16.3.6",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.2",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "prettier": "^3.9.8",
+    "tsx": "^4.23.15",
+    "typescript": "~5.8.3",
+    "ws": "^8.21.3"
+  }
+}
