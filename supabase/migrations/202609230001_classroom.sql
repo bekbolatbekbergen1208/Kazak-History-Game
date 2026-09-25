@@ -138,11 +138,34 @@ begin
  when 'unlock' then
   if r.status not in ('running','paused') or r.answer_revealed then raise exception 'INVALID_CONTROL'; end if;
   update rooms set answers_locked=false where id=r.id;
+ when 'add_time' then
+  if r.status not in ('running','paused') or r.deadline_at is null then raise exception 'INVALID_CONTROL'; end if;
+  update rooms set deadline_at=deadline_at+interval '5 minutes' where id=r.id;
  when 'end' then
   update rooms set status='ended',ended_at=now(),answers_locked=true,paused_ms=paused_ms+case when paused_at is not null then (extract(epoch from(now()-paused_at))*1000)::bigint else 0 end,paused_at=null,expires_at=least(expires_at,now()+interval '6 hours') where id=r.id;
  else raise exception 'INVALID_CONTROL';
  end case;
  update rooms set version=version+1 where id=r.id;
+end $$;
+
+create function public.classroom_skip(p_room_id uuid,p_participant_id uuid,p_task_id text,p_task_mission integer,p_progress_version integer)
+returns void language plpgsql security definer set search_path=public,pg_temp as $$
+declare r rooms%rowtype; p progress%rowtype; next_awards jsonb; total integer; done integer;
+begin
+ select * into strict r from rooms where id=p_room_id for update;
+ select * into strict p from progress where participant_id=p_participant_id and room_id=p_room_id for update;
+ if r.expires_at<=now() then raise exception 'ROOM_EXPIRED'; end if;
+ if r.status='paused' then raise exception 'ROOM_PAUSED'; end if;
+ if r.status='ended' then raise exception 'ROOM_ENDED'; end if;
+ if r.status<>'running' or r.mode<>'individual' or r.current_mission<>p_task_mission or p.version<>p_progress_version or p.finished_at is not null then raise exception 'STALE_STATE'; end if;
+ if p.awards ? p_task_id then raise exception 'ALREADY_SUBMITTED'; end if;
+ next_awards:=jsonb_set(p.awards,array[p_task_id],'0'::jsonb,true);
+ select coalesce(sum(value::integer),0),count(*) into total,done from jsonb_each_text(next_awards);
+ update progress set awards=next_awards,score=total,completed_tasks=done,current_task=p_task_id,
+ version=version+1,updated_at=now(),finished_at=case when p_task_id='final' then now() else finished_at end,
+ elapsed_seconds=case when p_task_id='final' then greatest(0,floor(extract(epoch from(now()-r.started_at))-r.paused_ms/1000.0)::integer) else elapsed_seconds end
+ where participant_id=p_participant_id;
+ update participants set last_seen_at=now() where id=p_participant_id;
 end $$;
 
 create function public.classroom_save_draft(p_room_id uuid,p_participant_id uuid,p_task_id text,p_draft jsonb)
@@ -222,5 +245,5 @@ begin
  delete from classroom_limits where window_start<now()-interval '2 hours';
  return deleted;
 end $$;
-revoke all on function public.classroom_rate_limit(text,integer,integer),public.classroom_join(uuid,text,text),public.classroom_control(uuid,text,text,integer),public.classroom_save_draft(uuid,uuid,text,jsonb),public.classroom_submit(uuid,uuid,uuid,text,integer,integer,text,jsonb,boolean,integer,integer),public.classroom_notify(),public.cleanup_classrooms() from public,anon,authenticated;
-grant execute on function public.classroom_rate_limit(text,integer,integer),public.classroom_join(uuid,text,text),public.classroom_control(uuid,text,text,integer),public.classroom_save_draft(uuid,uuid,text,jsonb),public.classroom_submit(uuid,uuid,uuid,text,integer,integer,text,jsonb,boolean,integer,integer),public.cleanup_classrooms() to service_role;
+revoke all on function public.classroom_rate_limit(text,integer,integer),public.classroom_join(uuid,text,text),public.classroom_control(uuid,text,text,integer),public.classroom_skip(uuid,uuid,text,integer,integer),public.classroom_save_draft(uuid,uuid,text,jsonb),public.classroom_submit(uuid,uuid,uuid,text,integer,integer,text,jsonb,boolean,integer,integer),public.classroom_notify(),public.cleanup_classrooms() from public,anon,authenticated;
+grant execute on function public.classroom_rate_limit(text,integer,integer),public.classroom_join(uuid,text,text),public.classroom_control(uuid,text,text,integer),public.classroom_skip(uuid,uuid,text,integer,integer),public.classroom_save_draft(uuid,uuid,text,jsonb),public.classroom_submit(uuid,uuid,uuid,text,integer,integer,text,jsonb,boolean,integer,integer),public.cleanup_classrooms() to service_role;

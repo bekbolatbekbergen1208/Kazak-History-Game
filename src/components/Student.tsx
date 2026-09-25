@@ -16,6 +16,7 @@ import {
   Volume2,
   VolumeX,
   WifiOff,
+  SkipForward,
 } from "lucide-react";
 import { missions, studiedTopics, topicTaskIds } from "../data/historyData";
 import type { Draft } from "../gameLogic";
@@ -143,7 +144,9 @@ export default function Student({ id }: { id: string }) {
           });
         else
           setMessage(
-            "Тағы бір рет тексеріңіз. Архив деректеріне назар аударыңыз.",
+            result.correction
+              ? `Қате жауап. Дұрыс жауап: ${result.correction}`
+              : "Қате жауап. Архив деректеріне назар аударыңыз.",
           );
       }
       await refresh();
@@ -225,6 +228,29 @@ export default function Student({ id }: { id: string }) {
       navigator.onLine ? "" : "Қайта қосылуда… Жауабыңыз құрылғыда сақталды.",
     );
     void flush();
+  };
+  const skip = async () => {
+    if (!task || !data || blocked || room.mode !== "individual") return;
+    if (!window.confirm("Бұл тапсырманы 0 ұпаймен өткізіп жібересіз бе?"))
+      return;
+    setBusy(true);
+    setMessage("");
+    try {
+      await send(`/api/rooms/${id}`, {
+        action: "skip",
+        taskId: task.id,
+        progressVersion: data.progress!.version,
+      });
+      setFeedback(null);
+      await refresh();
+    } catch (e) {
+      setMessage(
+        e instanceof Error ? e.message : "Тапсырманы өткізу мүмкін болмады.",
+      );
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
   };
   if (!data)
     return (
@@ -581,9 +607,20 @@ export default function Student({ id }: { id: string }) {
               )}
               {task.id !== "final" && (
                 <div className="task-actions">
-                  <button className="text-btn" onClick={() => setHint(!hint)}>
-                    <HelpCircle size={17} /> Көмек
-                  </button>
+                  <div className="task-secondary-actions">
+                    <button className="text-btn" onClick={() => setHint(!hint)}>
+                      <HelpCircle size={17} /> Көмек
+                    </button>
+                    {room.mode === "individual" && (
+                      <button
+                        className="text-btn"
+                        disabled={blocked}
+                        onClick={() => void skip()}
+                      >
+                        <SkipForward size={17} /> ӨТКІЗІП ЖІБЕРУ
+                      </button>
+                    )}
+                  </div>
                   <button
                     className="primary"
                     disabled={blocked}
@@ -597,6 +634,15 @@ export default function Student({ id }: { id: string }) {
                     <ArrowRight size={17} />
                   </button>
                 </div>
+              )}
+              {task.id === "final" && room.mode === "individual" && (
+                <button
+                  className="text-btn skip-final"
+                  disabled={blocked}
+                  onClick={() => void skip()}
+                >
+                  <SkipForward size={17} /> ӨТКІЗІП ЖІБЕРУ
+                </button>
               )}
             </section>
           )}

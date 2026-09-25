@@ -160,6 +160,61 @@ test("SQL: pause, locked answers, stale mission submissions and version conflict
   }
 });
 
+test("SQL: teacher adds five minutes and a student can skip an individual task", async () => {
+  const { db, roomId, join, control } = await setup();
+  try {
+    const student = await join("Мадина");
+    await control("start");
+    const before = (
+      await db.query<{ deadline_at: string }>(
+        "select deadline_at from rooms where id=$1",
+        [roomId],
+      )
+    ).rows[0].deadline_at;
+    await control("add_time");
+    const after = (
+      await db.query<{ deadline_at: string }>(
+        "select deadline_at from rooms where id=$1",
+        [roomId],
+      )
+    ).rows[0].deadline_at;
+    assert.equal(Date.parse(after) - Date.parse(before), 5 * 60 * 1000);
+
+    const progress = (
+      await db.query<Progress>(
+        "select * from progress where participant_id=$1",
+        [student],
+      )
+    ).rows[0];
+    await db.query("select classroom_skip($1,$2,$3,$4,$5)", [
+      roomId,
+      student,
+      "rys",
+      0,
+      progress.version,
+    ]);
+    const skipped = (
+      await db.query<Progress>(
+        "select * from progress where participant_id=$1",
+        [student],
+      )
+    ).rows[0];
+    assert.equal(skipped.awards.rys, 0);
+    assert.equal(skipped.score, 0);
+    assert.equal(skipped.completed_tasks, 1);
+    assert.equal(
+      currentTask(
+        (await db.query<Room>("select * from rooms where id=$1", [roomId]))
+          .rows[0],
+        skipped,
+      )?.id,
+      "stats",
+    );
+  } finally {
+    await db.close();
+  }
+});
+
 test("SQL: shared round freezes its roster, counts once, gates reveal and supports teacher early closure", async () => {
   const { db, roomId, join, control, submit } = await setup();
   try {

@@ -58,6 +58,7 @@ export const roomRequestSchema = z.discriminatedUnion("action", [
       "reveal",
       "lock",
       "unlock",
+      "add_time",
       "end",
     ]),
     taskId: z.string().max(40).optional(),
@@ -70,6 +71,11 @@ export const roomRequestSchema = z.discriminatedUnion("action", [
     round: z.number().int().nonnegative(),
     mode: z.enum(["individual", "class"]),
     answer: draftSchema,
+  }),
+  z.object({
+    action: z.literal("skip"),
+    taskId: z.string().max(40),
+    progressVersion: z.number().int().nonnegative(),
   }),
   z.object({
     action: z.literal("draft"),

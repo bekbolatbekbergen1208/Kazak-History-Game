@@ -117,4 +117,5 @@ export type Control =
   | "reveal"
   | "lock"
   | "unlock"
+  | "add_time"
   | "end";

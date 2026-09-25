@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   UnlockKeyhole,
   Users,
+  Clock3,
 } from "lucide-react";
 import { missions } from "../data/historyData";
 import { Header, Footer, Loading, RoomTimer } from "./ClassroomShared";
@@ -248,6 +249,13 @@ export default function Teacher({ id }: { id: string }) {
                     </span>
                   </div>
                   <div className="controls-row">
+                    <button
+                      className="secondary"
+                      disabled={busy || !connected}
+                      onClick={() => void control("add_time")}
+                    >
+                      <Clock3 size={16} /> +5 МИН
+                    </button>
                     <button
                       className="secondary"
                       disabled={busy || !connected}

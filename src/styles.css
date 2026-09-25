@@ -1117,6 +1117,15 @@ button:disabled {
   justify-content: space-between;
   gap: 15px;
 }
+.task-secondary-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.skip-final {
+  margin-top: 14px;
+}
 .text-btn {
   display: inline-flex;
   align-items: center;

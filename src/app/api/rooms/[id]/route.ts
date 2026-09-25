@@ -115,6 +115,24 @@ export async function POST(request: NextRequest, context: Context) {
       .single();
     if (error) throw new Error(error.message);
     const progress = state as Progress;
+    if (body.action === "skip") {
+      if (room.mode !== "individual")
+        throw new ApiError(409, "Ортақ тапсырманы өткізіп жіберуге болмайды.");
+      if (currentTask(room, progress)?.id !== task.id)
+        throw new ApiError(
+          409,
+          "Сабақ күйі өзгерді. Қазіргі тапсырманы қайта ашыңыз.",
+        );
+      const { error: skipError } = await db.rpc("classroom_skip", {
+        p_room_id: id,
+        p_participant_id: participant.id,
+        p_task_id: task.id,
+        p_task_mission: task.mission,
+        p_progress_version: body.progressVersion,
+      });
+      if (skipError) throw new Error(skipError.message);
+      return NextResponse.json({ ok: true });
+    }
     if (body.action === "draft") {
       if (room.status === "ended") throw new ApiError(409, "Сабақ аяқталды.");
       if (task.mission !== room.current_mission)
@@ -144,6 +162,10 @@ export async function POST(request: NextRequest, context: Context) {
         points: prior.points,
         explanation:
           prior.correct && room.mode === "individual" ? task.fact : undefined,
+        correction:
+          !prior.correct && room.mode === "individual"
+            ? answerFor(task)
+            : undefined,
       });
     if (currentTask(room, progress)?.id !== task.id)
       throw new ApiError(
@@ -174,6 +196,8 @@ export async function POST(request: NextRequest, context: Context) {
       points: response.points,
       explanation:
         correct && room.mode === "individual" ? task.fact : undefined,
+      correction:
+        !correct && room.mode === "individual" ? answerFor(task) : undefined,
       ...(room.answer_revealed ? { answer: answerFor(task) } : {}),
     });
   } catch (error) {
